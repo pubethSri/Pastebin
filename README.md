@@ -4,6 +4,7 @@ A LAN-hosted room where people drop text for each other to copy. One Bun
 process on your PC; everyone else opens `http://<your-IP>:3000`.
 
 Design and decisions: [`docs/01-design.md`](docs/01-design.md).
+Cross-machine test plan for the CLI: [`docs/02-cli-testing.md`](docs/02-cli-testing.md).
 
 ## Run it (the actual use case)
 
@@ -176,6 +177,11 @@ Four decisions worth knowing:
 `VERSION_MISMATCH` — and prints the download line for the server that refused
 it, rather than the server's own "reload the page". The download is served with
 `cache-control: no-cache` for the same reason.
+
+Testing it on real machines — an Ubuntu box, a second Windows PC — has its own
+checklist in [`docs/02-cli-testing.md`](docs/02-cli-testing.md), including the
+host addresses that only *look* reachable and the PowerShell pipe that mangles
+non-ASCII.
 
 Platform notes: it is `curl.exe`, not `curl`, in Windows PowerShell, which
 aliases the bare name to Invoke-WebRequest. A curl download carries no

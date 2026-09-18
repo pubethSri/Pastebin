@@ -1,0 +1,34 @@
+# Line endings are decided here rather than by whoever cloned the repository.
+#
+# Without this file, each contributor's `core.autocrlf` decides what bytes land
+# in a commit. The same file then arrives differently on different machines and
+# shows up as a whole-file diff nobody wrote — which is especially easy here,
+# where the host is Windows (autocrlf on) and the client under test is Ubuntu.
+
+# Anything Git recognises as text is stored as LF *and checked out as LF*, on
+# every platform. `eol=lf` rather than `text=auto` alone: on its own, `text=auto`
+# still hands Windows a CRLF working copy when autocrlf is on, so the checkout
+# and the repository disagree about a file neither side edited.
+* text=auto eol=lf
+
+# Exceptions, for files something other than an editor has to parse.
+# cmd.exe genuinely mis-parses a .bat/.cmd whose lines end in a bare LF, and a
+# .sh checked out with CRLF dies on Linux with "bad interpreter: no such file".
+# .ps1 tolerates either; it is here so Windows scripts stay consistent.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.sh  text eol=lf
+
+# Binary, so Git never rewrites bytes inside them and never prints a diff that
+# is megabytes of noise. The compiled CLI binaries in apps/cli/dist are ignored
+# rather than tracked, but this is an app that serves images, so one arriving in
+# the repository by hand is a matter of when.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.webp   binary
+*.ico    binary
+*.exe    binary
+*.sqlite binary
