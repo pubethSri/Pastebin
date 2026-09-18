@@ -1,0 +1,15 @@
+{
+  "name": "pastebin",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:server": "bun run --cwd apps/server dev",
+    "dev:client": "bun run --cwd apps/client dev",
+    "build": "bun run --cwd apps/client build",
+    "build:cli": "bun run --cwd apps/cli build",
+    "start": "bun run --cwd apps/server start",
+    "serve": "bun run build && bun run start",
+    "test": "bun test",
+    "check": "bun run --cwd apps/server check && bun run --cwd apps/client check && bun run --cwd apps/cli check"
+  }
+}

@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --color-paper: #faf9f7;
+  --color-card: #ffffff;
+  --color-ink: #16181d;
+  --color-muted: #6b7280;
+  --color-line: #e5e4e0;
+  --color-line-strong: #d3d2cd;
+
+  --radius-card: 10px;
+  --radius-button: 8px;
+
+  /*
+   * Syntax colours, all at 4.5:1 or better on both --color-paper and
+   * --color-card. Highlighting is decoration on untrusted text, so it has to
+   * stay legible even when it guesses the language wrong — which means no
+   * low-contrast greys and no colour carrying meaning on its own.
+   */
+  --color-tok-comment: #6b7280;
+  --color-tok-string: #15803d;
+  --color-tok-keyword: #7c3aed;
+  --color-tok-number: #b45309;
+  --color-tok-key: #1d4ed8;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  -webkit-text-size-adjust: 100%;
+}
+
+/*
+ * Block text is `pre`, not `pre-wrap`: a wrapped command is a command you can
+ * misread. Long lines scroll inside their own box instead, and the copy button
+ * is the intended way to get the text out anyway.
+ */
+.block-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre;
+  tab-size: 4;
+
+  /*
+   * `overflow-y: hidden` is load-bearing — do not delete it as redundant.
+   *
+   * CSS forbids `visible` alongside `auto`, so writing `overflow-x: auto` and
+   * leaving the other axis alone computes to `overflow-y: auto` as well. That
+   * silently makes every code block a *vertical* scroll container with zero
+   * scroll range, and on a touch screen it then claims upward swipes and never
+   * chains them to the feed behind it. A tall paste fills the phone screen, so
+   * every touch lands on it, and the page simply stops scrolling — horizontally
+   * fine, vertically dead.
+   *
+   * The box is content-height, so `hidden` clips nothing; it only stops the
+   * element pretending to be scrollable in an axis it can't scroll.
+   */
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  /*
+   * Keeps a horizontal fling inside the code block instead of letting it become
+   * the browser's back-navigation gesture.
+   */
+  overscroll-behavior-x: contain;
+}
+
+/*
+ * Colour only — no font-weight, no font-size, nothing that changes metrics.
+ * `.block-text` is `white-space: pre` with a horizontal scroller, and a bold
+ * keyword would shift every column after it on a line someone is trying to
+ * read against the original.
+ */
+.tok-comment {
+  color: var(--color-tok-comment);
+  font-style: italic;
+}
+.tok-string {
+  color: var(--color-tok-string);
+}
+.tok-keyword {
+  color: var(--color-tok-keyword);
+}
+.tok-number {
+  color: var(--color-tok-number);
+}
+.tok-key {
+  color: var(--color-tok-key);
+}
+
+/* The composer is fixed to the bottom, so it has to clear the home indicator. */
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+textarea {
+  font-family: var(--font-mono);
+}
