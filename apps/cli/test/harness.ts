@@ -54,7 +54,7 @@ export interface Running {
  * against it with strings for streams. Each `run` captures its own output,
  * so a test reads exactly what that command printed.
  */
-export function student(opts: { tty?: boolean } = {}) {
+export function student(opts: { tty?: boolean; stderrTty?: boolean; env?: Record<string, string> } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "pastebin-cli-"));
 
   const start = (argv: string[], stdin?: string | Uint8Array): Running => {
@@ -74,7 +74,8 @@ export function student(opts: { tty?: boolean } = {}) {
       readStdin: async () => (typeof stdin === "string" ? new TextEncoder().encode(stdin) : (stdin ?? new Uint8Array())),
       stdinIsTTY: false,
       stdoutIsTTY: opts.tty ?? false,
-      env: { PASTEBIN_CONFIG_DIR: dir },
+      stderrIsTTY: opts.stderrTty ?? false,
+      env: { PASTEBIN_CONFIG_DIR: dir, ...opts.env },
       platform: process.platform,
       arch: process.arch,
       interrupted: () => interrupted,

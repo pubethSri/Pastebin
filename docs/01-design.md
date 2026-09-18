@@ -428,3 +428,38 @@ does not notice.
   socket but leaves it open (the browser closes its own too), so a tail that
   only waited for the close would hang forever on a deleted room — caught by
   the test that deletes the room under it.
+
+### M8.1 — colour, images, and a fifth build
+
+- **The CLI renders a colour, it never chooses one.** `identity.ts` assigns the
+  palette round-robin by join order and it already rides on every block as
+  `authorColor`, so terminal colour is a rendering of a fact the protocol
+  already carried. Nothing hashes a name locally: two clients that each picked
+  their own colour would disagree about the same person, which is precisely
+  what the chip exists to prevent.
+- **24-bit escapes, not the 16-colour palette.** Twelve palette entries mapped
+  onto sixteen ANSI colours would collide, and telling people apart is the only
+  job the colour has. The hex is used exactly as sent, so the terminal matches
+  the browser chip rather than approximating it.
+- **Colour is a property of the stream, not of the run.** It is decided from
+  `stderr.isTTY`, because names ride on the status lines; stdout is content and
+  never coloured at all. `NO_COLOR` (any non-empty value, per no-color.org) and
+  `TERM=dumb` disable it, `FORCE_COLOR` forces it, and with both set off wins.
+  A `tail` redirected to a file therefore contains no escapes, which matters
+  because that file is usually about to be pasted somewhere.
+- **`[39m`, never `[0m`.** Restoring the default foreground cannot clobber an
+  attribute the surrounding line set; a full reset can. Asserted in a test.
+- **An image block is described, not drawn.** Terminal image protocols do exist
+  — kitty and iTerm2 will even take the encoded bytes directly — but not in
+  Windows Terminal, which is what this room's students have. The portable
+  alternative is half-block characters, and that needs a PNG *and* JPEG decoder
+  bundled into a paste tool to turn bytes into pixels. So the line carries the
+  filename, dimensions, size and an OSC 8 hyperlink instead, and a terminal
+  that ignores OSC 8 still shows a URL worth copying. It goes to stderr: an
+  image is not text anyone is going to paste.
+- **A fifth target, `bun-linux-arm64`.** Architecture is the one thing a binary
+  cannot adapt to — the wrong one fails at exec with "cannot execute binary
+  file" rather than misbehaving — and a cheap cloud Ubuntu box is as likely to
+  be Ampere or Graviton as x64. `cli.test.ts` pins the platform/arch pairs
+  rather than counting them, because an architecture that is merely missing
+  shows up as a student with no download offered.

@@ -15,6 +15,7 @@ export interface CliBuild {
   target: string;
   /** What `process.platform` / `process.arch` report on the machine it runs on. */
   platform: "win32" | "darwin" | "linux";
+  /** Matches `process.arch`. A binary cannot adapt to the wrong one — it simply will not execute. */
   arch: "x64" | "arm64";
   /** What the share panel calls it. */
   label: string;
@@ -24,7 +25,12 @@ export const CLI_BUILDS: readonly CliBuild[] = [
   { file: "pastebin-windows-x64.exe", target: "bun-windows-x64", platform: "win32", arch: "x64", label: "Windows" },
   { file: "pastebin-darwin-arm64", target: "bun-darwin-arm64", platform: "darwin", arch: "arm64", label: "macOS (Apple Silicon)" },
   { file: "pastebin-darwin-x64", target: "bun-darwin-x64", platform: "darwin", arch: "x64", label: "macOS (Intel)" },
-  { file: "pastebin-linux-x64", target: "bun-linux-x64", platform: "linux", arch: "x64", label: "Linux" },
+  { file: "pastebin-linux-x64", target: "bun-linux-x64", platform: "linux", arch: "x64", label: "Linux (x64)" },
+  // Cloud Ubuntu is often ARM now — Oracle's free tier, AWS Graviton, Hetzner —
+  // as is any Linux VM on an Apple Silicon Mac, and a 64-bit Raspberry Pi. An
+  // x64 binary on one of those does not degrade, it fails at exec with "cannot
+  // execute binary file", so the only fix is shipping the right architecture.
+  { file: "pastebin-linux-arm64", target: "bun-linux-arm64", platform: "linux", arch: "arm64", label: "Linux (ARM64)" },
 ];
 
 export const cliBuildFor = (platform: string, arch: string): CliBuild | undefined =>

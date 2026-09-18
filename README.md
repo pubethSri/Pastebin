@@ -107,7 +107,9 @@ curl.exe -o pastebin.exe http://192.168.1.5:3000/cli/pastebin-windows-x64.exe
 ```
 
 On macOS and Linux it is `curl -o pastebin … && chmod +x pastebin`, then
-`./pastebin join …`. After that:
+`./pastebin join …`. There are five builds — Windows, both Macs, and Linux on
+**x64 and ARM64**, because a cloud Ubuntu box is as likely to be ARM now as not
+and an x64 binary does not degrade on one, it refuses to exec. After that:
 
 ```bash
 cat error.log | pastebin post
@@ -137,13 +139,29 @@ stderr and text on stdout, and reconnects if the server blinks. `papers`,
 `use <title>`, `leave` and `status` do what they say; `pastebin --help` has the
 rest.
 
+**Names are shown in the member's own colour**, the same one the browser puts on
+their chip and on every block they post. The CLI never picks a colour — the
+palette is assigned server-side in `identity.ts` and rides on each block as
+`authorColor`, so the person who is teal in the browser is teal in a `tail`.
+Colour is written only to a terminal, so a redirect or a pipe collects none of
+it; `NO_COLOR` turns it off anyway and `FORCE_COLOR` turns it on for a pipe that
+can render it.
+
+**Images are described, not drawn.** A `tail` prints who posted one, its
+filename, dimensions and size, and the `/media/` URL as a clickable OSC 8 link —
+Ctrl+Click opens it in a real browser from Windows Terminal, iTerm2, GNOME
+Terminal, WezTerm or kitty. Actually rendering the picture would mean bundling a
+PNG and JPEG decoder to turn pixels into half-block characters, which is a lot
+of dependency for a paste tool; the link does the job. The line goes to stderr
+with the other status output, because an image is not text anyone will paste.
+
 **Building it.** `serve` does not build the CLI. This does:
 
 ```bash
 bun run build:cli
 ```
 
-It cross-compiles all four targets into `apps/cli/dist` — Bun downloads each
+It cross-compiles all five targets into `apps/cli/dist` — Bun downloads each
 foreign runtime the first time, so the first run needs internet, and after that
 it is a few seconds per target. The share panel only lists builds that exist on
 disk, so an unbuilt platform is simply absent rather than a broken link. Each

@@ -12,13 +12,18 @@ const mac = cliBuildFor("darwin", "arm64")!;
 const server = "http://192.168.1.5:3000";
 
 describe("CLI build list", () => {
-  test("covers the four platforms and every file name is unique", () => {
+  test("covers every platform and architecture pair, each with a unique file name", () => {
     expect(CLI_BUILDS.map((b) => `${b.platform}/${b.arch}`)).toEqual([
       "win32/x64",
       "darwin/arm64",
       "darwin/x64",
       "linux/x64",
+      "linux/arm64",
     ]);
+    // An architecture that is merely absent means a student's machine silently
+    // has no download offered, so the pairs are pinned rather than counted.
+    expect(cliBuildFor("linux", "arm64")?.target).toBe("bun-linux-arm64");
+    expect(cliBuildFor("linux", "x64")?.target).toBe("bun-linux-x64");
     expect(new Set(CLI_BUILDS.map((b) => b.file)).size).toBe(CLI_BUILDS.length);
     expect(cliBuildFor("freebsd", "x64")).toBeUndefined();
   });

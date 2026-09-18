@@ -88,7 +88,7 @@ Verify the server is reachable before touching any client:
 curl -s http://172.16.10.13:3000/api/cli
 ```
 
-Expect all four filenames. If this fails from the host itself, it is the
+Expect all five filenames. If this fails from the host itself, it is the
 address; if it works here but not from a client, it is the firewall.
 
 ---
@@ -104,9 +104,11 @@ seconds rather than debugging later:
 uname -m; ldd --version | head -1; grep -c avx2 /proc/cpuinfo
 ```
 
-- `uname -m` must be **x86_64**. If it says `aarch64`, this is an ARM machine
-  and no build in `CLI_BUILDS` fits it — add `bun-linux-arm64` to
-  `packages/protocol/src/cli.ts` and rebuild.
+- `uname -m` decides **which file to download**: `x86_64` takes
+  `pastebin-linux-x64`, `aarch64` takes `pastebin-linux-arm64`. Getting this
+  wrong does not degrade, it fails at exec with "cannot execute binary file".
+  Cloud Ubuntu is often ARM — Oracle's free tier, AWS Graviton — as is a Linux
+  VM on an Apple Silicon Mac.
 - glibc must be **2.31 or newer** (Ubuntu 20.04+). Alpine and other musl
   distributions will not run this binary at all.
 - If the AVX2 count is **0**, the standard build dies with `Illegal
@@ -117,6 +119,8 @@ uname -m; ldd --version | head -1; grep -c avx2 /proc/cpuinfo
 ```bash
 curl -o pastebin http://172.16.10.13:3000/cli/pastebin-linux-x64 && chmod +x pastebin
 ```
+
+On `aarch64`, swap the filename for `pastebin-linux-arm64`.
 
 ```bash
 ./pastebin --version
@@ -192,6 +196,42 @@ goes to stderr and the text to stdout:
 ```
 
 Only pasted text should appear. Leave a tail running for Phase 3.
+
+### 1.8 Colour
+
+Over SSH, colour is decided by the terminal you are sitting at, not by the
+server. With two or three people posting, each name in the tail should carry
+that member's colour — the same one on their chip in the browser. Check the two
+places it must **not** appear:
+
+```bash
+./pastebin tail > feed.txt 2> headers.txt
+```
+
+`feed.txt` is pasteable text with no escapes. Then confirm the opt-out works,
+since some CI and log collectors set it:
+
+```bash
+NO_COLOR=1 ./pastebin join $CODE
+```
+
+If your SSH client shows no colour at all, check `echo $TERM` is not `dumb`, and
+try `FORCE_COLOR=1` to separate a terminal that cannot render it from a
+detection problem.
+
+### 1.9 An image posted from the browser
+
+Paste a screenshot into the room from the host's browser with a tail running.
+Expect a two-line entry: who posted it, then the filename, dimensions, size and
+URL. Nothing is drawn — see the note in the README about why.
+
+```bash
+./pastebin tail 2>&1 >/dev/null | grep media
+```
+
+In Windows Terminal, iTerm2, GNOME Terminal, WezTerm or kitty the URL should be
+**Ctrl+Clickable** and open the image in a real browser. Confirm the raw URL is
+still there when piped, since that is what makes it copyable out of a log.
 
 ### 1.7 Multiple papers
 
@@ -460,6 +500,8 @@ afterwards, and note that `protocol.test.ts` asserts it as a literal, so
 | 2.4 | `get \| clip` | n/a | | |
 | 2.5 | Non-ASCII through a pipe | n/a | | PS version: |
 | 1.6 | `tail` prints live, streams split | | | |
+| 1.8 | Names coloured, none in a redirect, `NO_COLOR` works | | | |
+| 1.9 | Image line: metadata, and the link opens | | | |
 | 1.7 | Paper selection and whiteboard refusal | | | |
 | 3.1 | Three-way interop | | | |
 | 3.3 | CRLF normalised to LF | | | |
@@ -477,5 +519,5 @@ afterwards, and note that `protocol.test.ts` asserts it as a literal, so
    the sense that students will hit it. The answer is to post the file.
 4. **Defender flagging the exe**, which is the one result that would change how
    this gets distributed.
-5. **An ARM or musl Ubuntu**, which needs a build target that does not exist in
-   `CLI_BUILDS` yet.
+5. **A musl Ubuntu** (Alpine and friends), which no build covers — glibc 2.31+
+   is required. ARM64 is covered now, but only if you download the right file.

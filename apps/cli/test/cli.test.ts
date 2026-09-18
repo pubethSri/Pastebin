@@ -404,6 +404,141 @@ describe("tail", () => {
   });
 });
 
+describe("colour", () => {
+  /*
+   * The palette belongs to the server and rides on every block, so the only
+   * thing worth asserting is that the CLI renders the colour it was handed and
+   * never invents one — and, more importantly, that a redirect or a pipe gets
+   * none of it. A log full of escape codes is worse than no colour at all.
+   */
+  const ESC = "\u001b";
+
+  test("a terminal gets the member's own colour; a pipe gets plain text", async () => {
+    const teacher = await createRoom(srv.server);
+    const piped = student();
+    const terminal = student({ stderrTty: true });
+    try {
+      const plain = await enter(piped, teacher.code, "--name", "Ada");
+      expect(plain.err).toContain("as Ada (");
+      expect(plain.err).not.toContain(ESC);
+
+      const colored = await enter(terminal, teacher.code, "--name", "Ada");
+      // Whatever colour this member was assigned, the name is wrapped in it.
+      expect(colored.err).toMatch(/as \u001b\[38;2;\d+;\d+;\d+mAda\u001b\[39m /);
+    } finally {
+      teacher.conn.close();
+      piped.cleanup();
+      terminal.cleanup();
+    }
+  });
+
+  test("NO_COLOR is honoured even on a terminal", async () => {
+    const teacher = await createRoom(srv.server);
+    const s = student({ stderrTty: true, env: { NO_COLOR: "1" } });
+    try {
+      const res = await enter(s, teacher.code, "--name", "Ada");
+      expect(res.err).toContain("as Ada (");
+      expect(res.err).not.toContain(ESC);
+    } finally {
+      teacher.conn.close();
+      s.cleanup();
+    }
+  });
+
+  test("two people in a tail are two different colours, and stdout stays clean", async () => {
+    const teacher = await teacherWatching();
+    const watcher = student({ stderrTty: true });
+    const poster = student();
+    try {
+      await enter(watcher, teacher.code, "--name", "Watcher");
+      await enter(poster, teacher.code, "--name", "Poster");
+
+      const running = watcher.start(["tail"]);
+      await until(() => running.err().includes("Watching"));
+
+      teacher.conn.send({ type: "block.post", payload: { paperId: teacher.paperId, text: "from the teacher" } });
+      await until(() => running.out().includes("from the teacher"));
+      await poster.run(["post"], "from the poster\n");
+      await until(() => running.out().includes("from the poster"));
+
+      running.interrupt();
+      const res = await running.done;
+
+      const colors = new Set(Array.from(res.err.matchAll(/\u001b\[38;2;(\d+;\d+;\d+)m/g), (m) => m[1]));
+      expect(colors.size).toBe(2);
+      // The whole point of splitting the streams: the text is still pasteable.
+      expect(res.out).toBe("from the teacher\nfrom the poster\n");
+      expect(res.out).not.toContain(ESC);
+    } finally {
+      teacher.conn.close();
+      watcher.cleanup();
+      poster.cleanup();
+    }
+  });
+});
+
+describe("an image in a tail", () => {
+  /** The bytes go over HTTP exactly as the browser sends them; this only attaches the id. */
+  async function postImage(teacher: Bound, paperId: string): Promise<void> {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...new Array(64).fill(0x20)]);
+    const res = await fetch(`${srv.server}/api/upload?code=${teacher.code}&name=screenshot.png&w=1920&h=1080`, {
+      method: "POST",
+      headers: { "x-member-id": teacher.memberId, "x-member-token": teacher.token },
+      body: png,
+    });
+    const media = (await res.json()) as { id: string };
+    teacher.conn.send({ type: "block.postImage", payload: { paperId, mediaId: media.id } });
+  }
+
+  test("is described rather than rendered, with a link the terminal can open", async () => {
+    const teacher = await teacherWatching();
+    const s = student({ stderrTty: true });
+    try {
+      await enter(s, teacher.code);
+      const running = s.start(["tail"]);
+      await until(() => running.err().includes("Watching"));
+
+      await postImage(teacher, teacher.paperId);
+      await until(() => running.err().includes("posted an image"));
+
+      running.interrupt();
+      const res = await running.done;
+      expect(res.err).toContain("screenshot.png");
+      expect(res.err).toContain("1920x1080");
+      expect(res.err).toContain("72 B");
+      expect(res.err).toContain(`${srv.server}/media/`);
+      // OSC 8, so Ctrl+Click opens it in a real browser.
+      expect(res.err).toContain("\u001b]8;;");
+      // An image is not pasteable text, so nothing about it reaches stdout.
+      expect(res.out).toBe("");
+    } finally {
+      teacher.conn.close();
+      s.cleanup();
+    }
+  });
+
+  test("piped, the URL is plain so it can be copied out of a log", async () => {
+    const teacher = await teacherWatching();
+    const s = student();
+    try {
+      await enter(s, teacher.code);
+      const running = s.start(["tail"]);
+      await until(() => running.err().includes("Watching"));
+
+      await postImage(teacher, teacher.paperId);
+      await until(() => running.err().includes("posted an image"));
+
+      running.interrupt();
+      const res = await running.done;
+      expect(res.err).not.toContain("\u001b");
+      expect(res.err).toMatch(new RegExp(`${srv.server.replace(/[.]/g, "\\.")}/media/[0-9a-f-]+`));
+    } finally {
+      teacher.conn.close();
+      s.cleanup();
+    }
+  });
+});
+
 describe("a dead identity", () => {
   test("is forgotten and the message says to join again", async () => {
     const teacher = await createRoom(srv.server);

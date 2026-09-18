@@ -11,6 +11,7 @@ import {
 } from "@pastebin/protocol";
 import { basename } from "node:path";
 import { parseInvocation, type Flags } from "./args";
+import { styleFor, type Style } from "./color";
 import { Sessions, type RoomSession } from "./config";
 import { Connection, normalizeServer } from "./connection";
 import { CliError, IdentityGone, ServerRefused, UsageError } from "./errors";
@@ -31,6 +32,8 @@ export interface Io {
   readStdin(): Promise<Uint8Array>;
   stdinIsTTY: boolean;
   stdoutIsTTY: boolean;
+  /** Colour is decided by the stream it is written to, and names go to stderr. */
+  stderrIsTTY: boolean;
   env: Record<string, string | undefined>;
   platform: string;
   arch: string;
@@ -208,6 +211,16 @@ function describePapers(room: PublicRoomState, session: RoomSession): string {
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Status lines go to stderr, so that is the stream whose terminal-ness decides colour. */
+const styleOf = (io: Io): Style => styleFor(io.env, io.stderrIsTTY);
+
+/** `284 KB`. Only ever decoration on an image line, so the rounding is not load-bearing. */
+function humanBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 /* -------------------------------- commands -------------------------------- */
 
 async function join(io: Io, positional: string[], flags: Flags): Promise<number> {
@@ -225,7 +238,8 @@ async function join(io: Io, positional: string[], flags: Flags): Promise<number>
       sessions.update(code, { server });
       sessions.setCurrent(code);
       await sessions.save();
-      io.stderr(`Back in ${code} as ${bound.name} (${server})\n${describePapers(bound.room, sessions.room(code)!)}`);
+      const who = styleOf(io).name(bound.name, bound.color);
+      io.stderr(`Back in ${code} as ${who} (${server})\n${describePapers(bound.room, sessions.room(code)!)}`);
     } finally {
       bound.conn.close();
     }
@@ -252,7 +266,11 @@ async function join(io: Io, positional: string[], flags: Flags): Promise<number>
     sessions.set(code, { server, memberId: bound.memberId, token: bound.token, paperId: null });
     await sessions.save();
     const fresh = existing ? " with a fresh identity" : "";
-    io.stderr(`Joined ${code} as ${bound.name}${fresh} (${server})\n${describePapers(bound.room, sessions.room(code)!)}`);
+    // The name is shown in the colour the server just assigned, which is the
+    // same one the browser puts on this member's chip and on every block they
+    // post. Nothing here picks a colour; it renders the one it was handed.
+    const who = styleOf(io).name(bound.name, bound.color);
+    io.stderr(`Joined ${code} as ${who}${fresh} (${server})\n${describePapers(bound.room, sessions.room(code)!)}`);
   } finally {
     bound.conn.close();
   }
@@ -294,7 +312,8 @@ async function post(io: Io, positional: string[], flags: Flags): Promise<number>
     sessions.update(code, { paperId: paper.id });
     await sessions.save();
     const from = input.filename ? ` from ${input.filename}` : "";
-    io.stderr(`Posted ${fmt(input.text.length)} characters${from} to "${paper.title}" in ${code} as ${bound.name}\n`);
+    const who = styleOf(io).name(bound.name, bound.color);
+    io.stderr(`Posted ${fmt(input.text.length)} characters${from} to "${paper.title}" in ${code} as ${who}\n`);
   } finally {
     bound.conn.close();
   }
@@ -352,16 +371,36 @@ async function tail(io: Io, flags: Flags): Promise<number> {
     current?.close();
   });
 
+  const style = styleOf(io);
+
   const printBlock = (b: Block, edited: boolean): void => {
     if (seen.has(b.id) && !edited) return;
     seen.add(b.id);
     const when = new Date((edited ? b.editedAt : null) ?? b.createdAt).toLocaleTimeString();
+    // Each author in their own colour, which is what makes a busy feed
+    // scannable — the same job the coloured chip does in the browser.
+    const who = style.name(b.authorName, b.authorColor);
+
     if (b.kind === "image") {
-      io.stderr(`-- ${b.authorName} posted an image at ${when}: ${session.server}/media/${b.media?.id ?? ""} --\n`);
+      /*
+       * Not rendered, described. The bytes are a PNG or a JPEG and decoding one
+       * would mean bundling a decoder for a paste tool, so the useful thing is
+       * a line you can act on: what it is, and a link a terminal can open in a
+       * real browser. It goes to stderr with the other status lines, because an
+       * image is not text anyone is going to paste.
+       */
+      const url = `${session.server}/media/${b.media?.id ?? ""}`;
+      const facts = [
+        b.media?.name,
+        b.media?.width && b.media?.height ? `${b.media.width}x${b.media.height}` : null,
+        b.media ? humanBytes(b.media.byteSize) : null,
+      ].filter((x): x is string => Boolean(x));
+      io.stderr(`-- ${who} posted an image at ${when} --\n`);
+      io.stderr(`   ${style.dim(facts.join("  "))}${facts.length ? "  " : ""}${style.link(url, url)}\n`);
       return;
     }
     if (b.kind !== "text") return;
-    io.stderr(`-- ${b.authorName} at ${when}${edited ? " (edited)" : ""} --\n`);
+    io.stderr(`-- ${who} at ${when}${edited ? " (edited)" : ""} --\n`);
     io.stdout(b.text.endsWith("\n") ? b.text : `${b.text}\n`);
   };
 

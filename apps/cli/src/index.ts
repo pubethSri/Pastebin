@@ -12,6 +12,7 @@ const io: Io = {
   readStdin: async () => new Uint8Array(await Bun.stdin.arrayBuffer()),
   stdinIsTTY: Boolean(process.stdin.isTTY),
   stdoutIsTTY: Boolean(process.stdout.isTTY),
+  stderrIsTTY: Boolean(process.stderr.isTTY),
   env: process.env,
   platform: process.platform,
   arch: process.arch,
