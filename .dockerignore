@@ -1,0 +1,21 @@
+# Installed inside the image instead — and host node_modules would clobber the
+# symlink farm bun install just built in the builder stage.
+**/node_modules
+
+# Both dists are produced by stage 1; shipping the host's would make the image
+# depend on whatever was last built on someone's laptop.
+**/dist
+
+# Local room database, including the WAL sidecars.
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+
+.git
+.github
+.claude
+docs
+*.md
+.env
+Dockerfile
+docker-compose*.yml
