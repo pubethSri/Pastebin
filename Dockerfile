@@ -13,18 +13,26 @@ COPY apps/cli/package.json          apps/cli/
 COPY packages/protocol/package.json packages/protocol/
 RUN bun install --frozen-lockfile
 
-COPY . .
-
-# -> apps/client/dist, which is exactly where the server looks for it.
-RUN bun run build
-
 # The /cli/<file> downloads. Cross-compiling the five targets makes Bun fetch
 # each foreign runtime once, so this step needs working outbound internet and
 # adds ~400 MB to the image (five self-contained Bun binaries, 60-99 MB each).
 # BUILD_CLI=0 skips it: the server hides
 # the download section when apps/cli/dist is empty, rather than 404ing.
+#
+# It copies only its own two inputs, ahead of the full source, so editing the
+# web client does not invalidate this layer. Flat `COPY . .` first would mean
+# every front-end tweak re-downloads five foreign runtimes and recompiles all
+# of them -- minutes of rebuild for a change that cannot affect the binaries.
+COPY packages/protocol ./packages/protocol
+COPY apps/cli          ./apps/cli
 ARG BUILD_CLI=1
 RUN if [ "$BUILD_CLI" = "1" ]; then bun run build:cli; else mkdir -p apps/cli/dist; fi
+
+# .dockerignore excludes every dist/, so this cannot clobber the binaries above.
+COPY . .
+
+# -> apps/client/dist, which is exactly where the server looks for it.
+RUN bun run build
 
 # ---- Stage 2: runtime --------------------------------------------------------
 FROM oven/bun:1

@@ -5,6 +5,7 @@
   import { socket } from "../lib/socket.svelte";
   import { isImageFile, uploadImage } from "../lib/upload";
   import { readTextFile } from "../lib/textFile";
+  import CliHelpPanel from "../lib/room/CliHelpPanel.svelte";
   import DrawView from "../lib/room/DrawView.svelte";
   import PaperGrid from "../lib/room/PaperGrid.svelte";
   import PaperView from "../lib/room/PaperView.svelte";
@@ -16,6 +17,9 @@
   let renaming = $state(false);
   let draftName = $state("");
   let sharing = $state(false);
+  // One panel at a time: both drop in under the header, and two stacked
+  // push the paper off screen on a phone.
+  let helping = $state(false);
 
   /*
    * Armed on the route, not on socket state.
@@ -196,7 +200,24 @@
       <PresenceRow members={online} meId={me?.memberId ?? null} onRenameSelf={startRename} />
       <button
         type="button"
-        onclick={() => (sharing = !sharing)}
+        onclick={() => {
+          helping = !helping;
+          sharing = false;
+        }}
+        title="Command-line guide"
+        aria-label="Command-line guide"
+        aria-pressed={helping}
+        class="shrink-0 rounded-[var(--radius-button)] border px-2 py-1 text-[12px]
+          {helping ? 'border-ink bg-ink text-white' : 'border-line-strong hover:bg-paper'}"
+      >
+        ?
+      </button>
+      <button
+        type="button"
+        onclick={() => {
+          sharing = !sharing;
+          helping = false;
+        }}
         title="Show QR code and link"
         aria-pressed={sharing}
         class="shrink-0 rounded-[var(--radius-button)] border px-2 py-1 text-[12px]
@@ -209,6 +230,10 @@
 
   {#if sharing}
     <SharePanel {code} onClose={() => (sharing = false)} />
+  {/if}
+
+  {#if helping}
+    <CliHelpPanel {code} paperTitle={paper?.title ?? null} onClose={() => (helping = false)} />
   {/if}
 
   {#if renaming}
